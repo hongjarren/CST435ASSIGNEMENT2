@@ -44,12 +44,18 @@ class Food101DataLoader:
         Returns:
             List of image file paths
         """
-        images_root = self.dataset_path / "images"
-        if images_root.exists() and images_root.is_dir():
-            real_images = self._get_food101_real_images(num_images=num_images, categories=categories)
-            if real_images:
-                print(f"Found Food-101 dataset at {images_root}. Using {len(real_images)} images.")
-                return real_images
+        # Preferred sources in order: subset_2000, full food-101/images
+        preferred_sources = [
+            self.data_path / "subset_2000",
+            self.dataset_path / "images",
+        ]
+
+        for images_root in preferred_sources:
+            if images_root.exists() and images_root.is_dir():
+                real_images = self._get_food101_real_images(num_images=num_images, categories=categories, root=images_root)
+                if real_images:
+                    print(f"Found dataset at {images_root}. Using {len(real_images)} images.")
+                    return real_images
 
         # Fall back to synthetic images
         sample_dir = self.data_path / "sample_images"
@@ -72,13 +78,13 @@ class Food101DataLoader:
         print(f"Sample images ready at {sample_dir}")
         return image_paths
 
-    def _get_food101_real_images(self, num_images: int, categories: List[str] | None) -> List[str]:
+    def _get_food101_real_images(self, num_images: int, categories: List[str] | None, root: Path | None = None) -> List[str]:
         """
         Return up to num_images image paths from real Food-101 dataset if present.
 
         Tries to balance selection across categories when possible.
         """
-        images_root = self.dataset_path / "images"
+        images_root = root if root is not None else (self.dataset_path / "images")
         if not images_root.exists():
             return []
 
