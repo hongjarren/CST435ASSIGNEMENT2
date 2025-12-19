@@ -45,6 +45,7 @@ data/sample_images/
 *.jpg
 *.jpeg
 *.png
+!data/subset_2000/**
 !README.md
 
 # Output files (large results)
