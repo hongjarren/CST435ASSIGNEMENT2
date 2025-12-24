@@ -82,13 +82,22 @@ class Food101DataLoader:
         """
         Return up to num_images image paths from real Food-101 dataset if present.
 
-        Tries to balance selection across categories when possible.
+        Handles both flat folders (images directly in root) and nested class folders.
         """
         images_root = root if root is not None else (self.dataset_path / "images")
         if not images_root.exists():
             return []
 
-        # Determine categories
+        # Check if flat folder (images directly in root) or nested (class subdirs)
+        direct_imgs = list(images_root.glob("*.jpg")) + list(images_root.glob("*.jpeg")) + list(images_root.glob("*.png"))
+        
+        if direct_imgs:
+            # Flat folder case (e.g., subset_2000)
+            random.shuffle(direct_imgs)
+            take = min(num_images, len(direct_imgs))
+            return [str(p) for p in direct_imgs[:take]]
+
+        # Nested folder case (e.g., food-101/images with class subdirs)
         if categories:
             class_dirs = [images_root / c for c in categories if (images_root / c).is_dir()]
         else:
@@ -111,17 +120,6 @@ class Food101DataLoader:
             selected.extend(str(p) for p in imgs[:take])
             if len(selected) >= num_images:
                 break
-
-        # If still short, fill from any remaining images
-        if len(selected) < num_images:
-            all_imgs = list(images_root.rglob("*.jpg")) + list(images_root.rglob("*.jpeg")) + list(images_root.rglob("*.png"))
-            random.shuffle(all_imgs)
-            for p in all_imgs:
-                sp = str(p)
-                if sp not in selected:
-                    selected.append(sp)
-                if len(selected) >= num_images:
-                    break
 
         return selected[:num_images]
     
