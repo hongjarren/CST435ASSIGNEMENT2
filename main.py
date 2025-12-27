@@ -394,7 +394,7 @@ def main():
                        help='Skip sequential baseline (for faster testing)')
     parser.add_argument('--test-single', action='store_true',
                        help='Run single-pipeline test instead of full comparison')
-    parser.add_argument('--pipeline', choices=['sequential', 'multiprocessing', 'threadpool', 'processpool'],
+    parser.add_argument('--pipeline', choices=['sequential', 'multiprocessing', 'multiprocessing_pool', 'threadpool', 'processpool'],
                        default='processpool',
                        help='Specific pipeline to test (with --test-single)')
     parser.add_argument('--num-workers', type=int, default=None,
@@ -417,6 +417,8 @@ def main():
             exec_time, results = comparison.run_sequential(image_paths, filters_config)
         elif args.pipeline == 'multiprocessing':
             exec_time, results = comparison.run_multiprocessing(image_paths, filters_config)
+        elif args.pipeline == 'multiprocessing_pool':
+            exec_time, results = comparison.run_multiprocessing_pool(image_paths, filters_config)
         elif args.pipeline == 'threadpool':
             exec_time, results = comparison.run_threadpool(image_paths, filters_config)
         else:  # processpool
