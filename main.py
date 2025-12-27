@@ -24,15 +24,17 @@ from concurrent_pipeline import ThreadPoolPipeline, ProcessPoolPipeline, Adaptiv
 class PerformanceComparison:
     """Compare performance of different parallelization approaches"""
     
-    def __init__(self, output_dir: str = "./output"):
+    def __init__(self, output_dir: str = "./output", num_workers: int = None):
         """
         Initialize performance comparison.
         
         Args:
             output_dir: Directory to save results and processed images
+            num_workers: Number of workers for parallel execution (None = optimal/CPU count)
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.num_workers = num_workers
         self.results = {}
     
     def get_filter_config(self, filter_type: str = "all") -> Dict:
@@ -114,10 +116,10 @@ class PerformanceComparison:
             Tuple of (execution_time, results)
         """
         print("\n" + "="*60)
-        print("MULTIPROCESSING PIPELINE")
+        print(f"MULTIPROCESSING PIPELINE (Workers: {self.num_workers or 'CPU count'})")
         print("="*60)
         
-        pipeline = MultiprocessingPipeline(num_processes=None)
+        pipeline = MultiprocessingPipeline(num_processes=self.num_workers)
         
         start_time = time.time()
         results = pipeline.process_images(image_paths, filters_config, verbose=True)
@@ -139,10 +141,10 @@ class PerformanceComparison:
             Tuple of (execution_time, results)
         """
         print("\n" + "="*60)
-        print("MULTIPROCESSING POOL PIPELINE")
+        print(f"MULTIPROCESSING POOL PIPELINE (Workers: {self.num_workers or 'CPU count'})")
         print("="*60)
         
-        pipeline = MultiprocessingPoolPipeline(num_processes=None)
+        pipeline = MultiprocessingPoolPipeline(num_processes=self.num_workers)
         
         start_time = time.time()
         results = pipeline.process_images(image_paths, filters_config, verbose=True)
@@ -164,10 +166,10 @@ class PerformanceComparison:
             Tuple of (execution_time, results)
         """
         print("\n" + "="*60)
-        print("THREADPOOL EXECUTOR PIPELINE")
+        print(f"THREADPOOL EXECUTOR PIPELINE (Workers: {self.num_workers or 'optimal'})")
         print("="*60)
         
-        pipeline = ThreadPoolPipeline(num_workers=None)
+        pipeline = ThreadPoolPipeline(num_workers=self.num_workers)
         
         start_time = time.time()
         results = pipeline.process_images(image_paths, filters_config, verbose=True)
@@ -189,10 +191,10 @@ class PerformanceComparison:
             Tuple of (execution_time, results)
         """
         print("\n" + "="*60)
-        print("PROCESS POOL EXECUTOR PIPELINE")
+        print(f"PROCESS POOL EXECUTOR PIPELINE (Workers: {self.num_workers or 'CPU count'})")
         print("="*60)
         
-        pipeline = ProcessPoolPipeline(num_workers=None)
+        pipeline = ProcessPoolPipeline(num_workers=self.num_workers)
         
         start_time = time.time()
         results = pipeline.process_images(image_paths, filters_config, verbose=True)
@@ -214,10 +216,10 @@ class PerformanceComparison:
             Tuple of (execution_time, results)
         """
         print("\n" + "="*60)
-        print("ADAPTIVE CONCURRENT PIPELINE")
+        print(f"ADAPTIVE CONCURRENT PIPELINE (Max Workers: {self.num_workers or 'Auto'})")
         print("="*60)
         
-        pipeline = AdaptiveConcurrentPipeline(num_workers=None)
+        pipeline = AdaptiveConcurrentPipeline(num_workers=self.num_workers)
         
         start_time = time.time()
         results = pipeline.process_images(image_paths, filters_config, verbose=True)
@@ -278,7 +280,9 @@ class PerformanceComparison:
             num_processes = data.get('num_workers', 1)
             
             # Handle 'optimal' num_processes
-            if isinstance(num_processes, str):
+            if self.num_workers is not None:
+                num_processes = self.num_workers
+            elif isinstance(num_processes, str):
                 num_processes = 1
             
             efficiency = (speedup / num_processes * 100) if num_processes > 0 else 0
@@ -328,7 +332,8 @@ class PerformanceComparison:
             import os
             self.results['multiprocessing'] = {
                 'time': exec_time,
-                'num_workers': os.cpu_count(),
+                'time': exec_time,
+                'num_workers': self.num_workers or os.cpu_count(),
                 'method': 'Multiprocessing Pipeline'
             }
         except Exception as e:
@@ -340,7 +345,7 @@ class PerformanceComparison:
             import os
             self.results['multiprocessing_pool'] = {
                 'time': exec_time,
-                'num_workers': os.cpu_count(),
+                'num_workers': self.num_workers or os.cpu_count(),
                 'method': 'Multiprocessing Pool'
             }
         except Exception as e:
@@ -351,7 +356,7 @@ class PerformanceComparison:
             exec_time, _ = self.run_threadpool(image_paths, filters_config)
             self.results['threadpool'] = {
                 'time': exec_time,
-                'num_workers': 'optimal',
+                'num_workers': self.num_workers or 'optimal',
                 'method': 'ThreadPoolExecutor'
             }
         except Exception as e:
@@ -363,7 +368,7 @@ class PerformanceComparison:
             import os
             self.results['processpool'] = {
                 'time': exec_time,
-                'num_workers': os.cpu_count(),
+                'num_workers': self.num_workers or os.cpu_count(),
                 'method': 'ProcessPoolExecutor'
             }
             # Save sample results
@@ -392,6 +397,8 @@ def main():
     parser.add_argument('--pipeline', choices=['sequential', 'multiprocessing', 'threadpool', 'processpool'],
                        default='processpool',
                        help='Specific pipeline to test (with --test-single)')
+    parser.add_argument('--num-workers', type=int, default=None,
+                       help='Number of workers (threads/processes) to use (default: optimal/CPU count)')
     
     args = parser.parse_args()
     
@@ -403,7 +410,7 @@ def main():
     if args.test_single:
         # Run single pipeline test
         print(f"\nRunning single pipeline test: {args.pipeline}")
-        comparison = PerformanceComparison(output_dir=args.output_dir)
+        comparison = PerformanceComparison(output_dir=args.output_dir, num_workers=args.num_workers)
         filters_config = comparison.get_filter_config(args.filter_type)
         
         if args.pipeline == 'sequential':
@@ -418,7 +425,7 @@ def main():
         print(f"\nExecution time: {exec_time:.2f} seconds")
     else:
         # Run full comparison
-        comparison = PerformanceComparison(output_dir=args.output_dir)
+        comparison = PerformanceComparison(output_dir=args.output_dir, num_workers=args.num_workers)
         comparison.run_all_comparisons(
             image_paths,
             filter_type=args.filter_type,
