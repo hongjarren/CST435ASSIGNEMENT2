@@ -11,6 +11,7 @@ from typing import List, Dict, Tuple
 import cv2
 import numpy as np
 import json
+import matplotlib.pyplot as plt
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -465,6 +466,55 @@ class PerformanceComparison:
         with open(results_file, 'w') as f:
             json.dump(results, f, indent=2)
         print(f"\nResults saved to: {results_file}")
+        
+        # Generate plots
+        self._plot_core_scaling_results(results)
+        print(f"\nPlots saved to: {self.output_dir / 'core_scaling_plots.png'}")
+    
+    def _plot_core_scaling_results(self, results: Dict):
+        """
+        Generate visualization plots for core scaling benchmark results.
+        
+        Args:
+            results: Dictionary containing benchmark results
+        """
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))
+        fig.suptitle('Core Scaling Performance Analysis - Execution Time vs Cores', fontsize=16, fontweight='bold')
+        
+        colors = {
+            'multiprocessing': '#2E86AB',
+            'multiprocessing_pool': '#A23B72',
+            'processpool': '#F18F01',
+            'threadpool': '#C73E1D'
+        }
+        
+        axes = [ax1, ax2, ax3, ax4]
+        pipeline_items = list(results['pipelines'].items())
+        
+        # Create separate plot for each pipeline
+        for idx, (pipeline_key, pipeline_data) in enumerate(pipeline_items):
+            ax = axes[idx]
+            cores = [r['cores'] for r in pipeline_data['results']]
+            times = [r['time'] for r in pipeline_data['results']]
+            
+            ax.plot(cores, times, marker='o', linewidth=2.5, markersize=10,
+                   color=colors.get(pipeline_key, 'gray'))
+            
+            # Add value labels on points
+            for core, time in zip(cores, times):
+                ax.text(core, time, f'{time:.2f}s', 
+                       ha='center', va='bottom', fontsize=9, fontweight='bold')
+            
+            ax.set_xlabel('Number of Cores', fontsize=11, fontweight='bold')
+            ax.set_ylabel('Execution Time (seconds)', fontsize=11, fontweight='bold')
+            ax.set_title(f'{pipeline_data["name"]}', fontsize=12, fontweight='bold')
+            ax.grid(True, alpha=0.3)
+            ax.set_xticks(cores)
+        
+        plt.tight_layout()
+        plot_file = self.output_dir / 'core_scaling_plots.png'
+        plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+        plt.close()
 
 
 def main():
