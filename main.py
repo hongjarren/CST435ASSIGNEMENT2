@@ -378,6 +378,93 @@ class PerformanceComparison:
         
         # Print summary
         self.print_comparison_summary()
+    
+    def run_core_scaling_benchmark(self, image_paths: List[str], filter_type: str, core_counts: List[int]):
+        """
+        Run benchmark across multiple core counts for all parallel pipelines.
+        
+        Args:
+            image_paths: List of image file paths
+            filter_type: Type of filters to apply
+            core_counts: List of core counts to test
+        """
+        import os
+        filters_config = self.get_filter_config(filter_type)
+        
+        # Run sequential baseline once
+        print("\n" + "="*70)
+        print("CORE SCALING BENCHMARK")
+        print("="*70)
+        print(f"\nImages: {len(image_paths)}")
+        print(f"Filters: {filter_type}")
+        print(f"Core counts: {core_counts}")
+        print("\nRunning sequential baseline...")
+        baseline_time, _ = self.run_sequential(image_paths, filters_config)
+        print(f"Sequential baseline: {baseline_time:.2f}s\n")
+        
+        # Results storage
+        results = {
+            'baseline': baseline_time,
+            'pipelines': {}
+        }
+        
+        pipelines = [
+            ('multiprocessing', 'Multiprocessing Pipeline', self.run_multiprocessing),
+            ('multiprocessing_pool', 'Multiprocessing Pool', self.run_multiprocessing_pool),
+            ('processpool', 'ProcessPoolExecutor', self.run_processpool),
+            ('threadpool', 'ThreadPoolExecutor', self.run_threadpool)
+        ]
+        
+        for pipeline_key, pipeline_name, pipeline_func in pipelines:
+            print(f"\n{'='*70}")
+            print(f"Testing: {pipeline_name}")
+            print(f"{'='*70}")
+            
+            pipeline_results = []
+            for cores in core_counts:
+                print(f"\nTesting with {cores} cores...")
+                self.num_workers = cores
+                try:
+                    exec_time, _ = pipeline_func(image_paths, filters_config)
+                    speedup = baseline_time / exec_time
+                    efficiency = (speedup / cores) * 100
+                    
+                    pipeline_results.append({
+                        'cores': cores,
+                        'time': exec_time,
+                        'speedup': speedup,
+                        'efficiency': efficiency
+                    })
+                    
+                    print(f"  Time: {exec_time:.2f}s")
+                    print(f"  Speedup: {speedup:.2f}x")
+                    print(f"  Efficiency: {efficiency:.1f}%")
+                except Exception as e:
+                    print(f"  Failed: {e}")
+            
+            results['pipelines'][pipeline_key] = {
+                'name': pipeline_name,
+                'results': pipeline_results
+            }
+        
+        # Print summary table
+        print("\n" + "="*70)
+        print("SUMMARY")
+        print("="*70)
+        print(f"\nSequential Baseline: {baseline_time:.2f}s\n")
+        
+        for pipeline_key, pipeline_data in results['pipelines'].items():
+            print(f"\n{pipeline_data['name']}:")
+            print(f"  {'Cores':<8} {'Time (s)':<12} {'Speedup':<12} {'Efficiency':<12}")
+            print(f"  {'-'*44}")
+            for r in pipeline_data['results']:
+                print(f"  {r['cores']:<8} {r['time']:<12.2f} {r['speedup']:<12.2f}x {r['efficiency']:<12.1f}%")
+        
+        # Save results to JSON
+        results_file = self.output_dir / 'core_scaling_results.json'
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        print(f"\nResults saved to: {results_file}")
 
 
 def main():
@@ -399,6 +486,10 @@ def main():
                        help='Specific pipeline to test (with --test-single)')
     parser.add_argument('--num-workers', type=int, default=None,
                        help='Number of workers (threads/processes) to use (default: optimal/CPU count)')
+    parser.add_argument('--benchmark-cores', action='store_true',
+                       help='Run core scaling benchmark across multiple core counts')
+    parser.add_argument('--core-counts', type=int, nargs='+', default=[1, 2, 4, 8],
+                       help='Core counts to test in benchmark mode (default: 1 2 4 8)')
     
     args = parser.parse_args()
     
@@ -407,7 +498,15 @@ def main():
     image_paths = prepare_dataset(num_images=args.num_images, output_dir='./data')
     print(f"Loaded {len(image_paths)} images")
     
-    if args.test_single:
+    if args.benchmark_cores:
+        # Run core scaling benchmark
+        comparison = PerformanceComparison(output_dir=args.output_dir)
+        comparison.run_core_scaling_benchmark(
+            image_paths,
+            filter_type=args.filter_type,
+            core_counts=args.core_counts
+        )
+    elif args.test_single:
         # Run single pipeline test
         print(f"\nRunning single pipeline test: {args.pipeline}")
         comparison = PerformanceComparison(output_dir=args.output_dir, num_workers=args.num_workers)

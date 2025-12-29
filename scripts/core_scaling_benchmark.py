@@ -18,7 +18,7 @@ from multiprocessing_pipeline import MultiprocessingPoolPipeline
 from concurrent_pipeline import ProcessPoolPipeline, ThreadPoolPipeline
 
 
-def run_benchmark(image_paths, filters_config, core_counts, pipeline_type='processpool'):
+def run_benchmark(image_paths, filters_config, core_counts, pipeline_type='processpool', baseline_time=None):
     """
     Run benchmark with different core counts.
     
@@ -27,9 +27,10 @@ def run_benchmark(image_paths, filters_config, core_counts, pipeline_type='proce
         filters_config: Filter configuration
         core_counts: List of core counts to test
         pipeline_type: 'processpool', 'multiprocessing_pool', or 'threadpool'
+        baseline_time: Pre-computed sequential baseline time (optional)
         
     Returns:
-        Dictionary with results
+        Dictionary with results and baseline time
     """
     results = {
         'core_counts': core_counts,
@@ -45,22 +46,25 @@ def run_benchmark(image_paths, filters_config, core_counts, pipeline_type='proce
     print(f"Testing cores: {core_counts}")
     print(f"{'='*60}\n")
     
-    # Run sequential baseline (1 core equivalent)
-    print("Running sequential baseline...")
-    from filters import ImageProcessingPipeline
-    baseline_pipeline = ImageProcessingPipeline()
-    
-    start = time.time()
-    for idx, img_path in enumerate(image_paths):
-        try:
-            baseline_pipeline.process_image(img_path, filters_config)
-        except Exception as e:
-            print(f"Error: {e}")
-        if (idx + 1) % 100 == 0:
-            print(f"  Processed {idx + 1}/{len(image_paths)}")
-    
-    baseline_time = time.time() - start
-    print(f"Sequential baseline: {baseline_time:.2f}s\n")
+    # Run sequential baseline only if not provided
+    if baseline_time is None:
+        print("Running sequential baseline...")
+        from filters import ImageProcessingPipeline
+        baseline_pipeline = ImageProcessingPipeline()
+        
+        start = time.time()
+        for idx, img_path in enumerate(image_paths):
+            try:
+                baseline_pipeline.process_image(img_path, filters_config)
+            except Exception as e:
+                print(f"Error: {e}")
+            if (idx + 1) % 100 == 0:
+                print(f"  Processed {idx + 1}/{len(image_paths)}")
+        
+        baseline_time = time.time() - start
+        print(f"Sequential baseline: {baseline_time:.2f}s\n")
+    else:
+        print(f"Using pre-computed sequential baseline: {baseline_time:.2f}s\n")
     
     # Test each core count
     for cores in core_counts:
@@ -244,15 +248,14 @@ def main():
     baseline_time = None
     
     for pipeline in args.pipelines:
-        results, base_time = run_benchmark(
+        results, baseline_time = run_benchmark(
             image_paths, 
             filters_config, 
             args.cores,
-            pipeline_type=pipeline
+            pipeline_type=pipeline,
+            baseline_time=baseline_time  # Pass baseline to subsequent runs
         )
         results_dict[pipeline] = results
-        if baseline_time is None:
-            baseline_time = base_time
     
     # Plot results
     plot_results(results_dict, baseline_time)
