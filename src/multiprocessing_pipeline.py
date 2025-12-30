@@ -1,110 +1,14 @@
 """
 Multiprocessing-based Parallel Image Processing
-Implements image processing using Python's multiprocessing module
+Implements image processing using Python's multiprocessing module (Pool variant)
 """
 
 import multiprocessing as mp
-import os
 from typing import List, Dict, Tuple
-import time
-from pathlib import Path
 import cv2
 import numpy as np
-from concurrent.futures import ProcessPoolExecutor
 
 from filters import ImageProcessingPipeline
-
-
-class MultiprocessingPipeline(ImageProcessingPipeline):
-    """Image processing pipeline using multiprocessing"""
-    
-    def __init__(self, num_processes: int = None):
-        """
-        Initialize multiprocessing pipeline.
-        
-        Args:
-            num_processes: Number of worker processes (None = CPU count)
-        """
-        super().__init__()
-        self.num_processes = num_processes or mp.cpu_count()
-    
-    def process_images(self, image_paths: List[str], filters_config: Dict, 
-                      verbose: bool = True) -> List[Tuple[str, np.ndarray]]:
-        """
-        Process multiple images in parallel using multiprocessing.
-        Uses ProcessPoolExecutor which handles Windows better than direct Process management.
-        
-        Args:
-            image_paths: List of image file paths
-            filters_config: Dictionary of filter configurations
-            verbose: Print progress information
-            
-        Returns:
-            List of (image_path, processed_image) tuples
-        """
-        if verbose:
-            print(f"Starting multiprocessing pipeline with {self.num_processes} processes")
-            print(f"Processing {len(image_paths)} images...")
-        
-        results = []
-        errors = []
-        
-        # Use ProcessPoolExecutor for better Windows compatibility
-        with ProcessPoolExecutor(max_workers=self.num_processes) as executor:
-            # Submit all tasks
-            futures = {
-                executor.submit(self._worker_wrapper, path, filters_config): (idx, path)
-                for idx, path in enumerate(image_paths)
-            }
-            
-            # Collect results as they complete
-            completed = 0
-            for future in futures:
-                completed += 1
-                idx, image_path = futures[future]
-                
-                try:
-                    processed_image, error = future.result(timeout=300)  # 5 minute timeout
-                    
-                    if error is None:
-                        results.append((image_path, processed_image))
-                    else:
-                        errors.append((image_path, error))
-                        if verbose:
-                            print(f"Error processing {image_path}: {error}")
-                except Exception as e:
-                    errors.append((image_path, str(e)))
-                    if verbose:
-                        print(f"Exception processing {image_path}: {e}")
-                
-                if verbose and completed % 10 == 0:
-                    print(f"  Completed {completed}/{len(image_paths)} images")
-        
-        if verbose:
-            print(f"Successfully processed {len(results)} images")
-            if errors:
-                print(f"Failed to process {len(errors)} images")
-        
-        return results
-    
-    @staticmethod
-    def _worker_wrapper(image_path: str, filters_config: dict) -> Tuple:
-        """
-        Static wrapper for worker process (for pickling compatibility).
-        
-        Args:
-            image_path: Path to image
-            filters_config: Filter configuration
-            
-        Returns:
-            Tuple of (processed_image, error)
-        """
-        try:
-            pipeline = ImageProcessingPipeline()
-            _, processed_image = pipeline.process_image(image_path, filters_config)
-            return processed_image, None
-        except Exception as e:
-            return None, str(e)
 
 
 def batch_worker(batch_data: Tuple) -> List[Tuple]:

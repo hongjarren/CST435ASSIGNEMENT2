@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from data_loader import prepare_dataset, Food101DataLoader
 from filters import ImageProcessingPipeline
-from multiprocessing_pipeline import MultiprocessingPipeline, MultiprocessingPoolPipeline
+from multiprocessing_pipeline import MultiprocessingPoolPipeline
 from concurrent_pipeline import ThreadPoolPipeline, ProcessPoolPipeline, AdaptiveConcurrentPipeline
 
 
@@ -102,31 +102,6 @@ class PerformanceComparison:
         
         print(f"Sequential processing completed in {elapsed_time:.2f} seconds")
         print(f"Successfully processed {len(results)} images")
-        
-        return elapsed_time, results
-    
-    def run_multiprocessing(self, image_paths: List[str], filters_config: Dict) -> Tuple[float, List]:
-        """
-        Process images using multiprocessing.
-        
-        Args:
-            image_paths: List of image paths
-            filters_config: Filter configuration
-            
-        Returns:
-            Tuple of (execution_time, results)
-        """
-        print("\n" + "="*60)
-        print(f"MULTIPROCESSING PIPELINE (Workers: {self.num_workers or 'CPU count'})")
-        print("="*60)
-        
-        pipeline = MultiprocessingPipeline(num_processes=self.num_workers)
-        
-        start_time = time.time()
-        results = pipeline.process_images(image_paths, filters_config, verbose=True)
-        elapsed_time = time.time() - start_time
-        
-        print(f"Multiprocessing completed in {elapsed_time:.2f} seconds")
         
         return elapsed_time, results
     
@@ -327,19 +302,6 @@ class PerformanceComparison:
                 'method': 'Sequential Processing'
             }
         
-        # Multiprocessing
-        try:
-            exec_time, _ = self.run_multiprocessing(image_paths, filters_config)
-            import os
-            self.results['multiprocessing'] = {
-                'time': exec_time,
-                'time': exec_time,
-                'num_workers': self.num_workers or os.cpu_count(),
-                'method': 'Multiprocessing Pipeline'
-            }
-        except Exception as e:
-            print(f"Multiprocessing failed: {e}")
-        
         # Multiprocessing Pool
         try:
             exec_time, _ = self.run_multiprocessing_pool(image_paths, filters_config)
@@ -410,7 +372,6 @@ class PerformanceComparison:
         }
         
         pipelines = [
-            ('multiprocessing', 'Multiprocessing Pipeline', self.run_multiprocessing),
             ('multiprocessing_pool', 'Multiprocessing Pool', self.run_multiprocessing_pool),
             ('processpool', 'ProcessPoolExecutor', self.run_processpool),
             ('threadpool', 'ThreadPoolExecutor', self.run_threadpool)
@@ -531,7 +492,7 @@ def main():
                        help='Skip sequential baseline (for faster testing)')
     parser.add_argument('--test-single', action='store_true',
                        help='Run single-pipeline test instead of full comparison')
-    parser.add_argument('--pipeline', choices=['sequential', 'multiprocessing', 'multiprocessing_pool', 'threadpool', 'processpool'],
+    parser.add_argument('--pipeline', choices=['sequential', 'multiprocessing_pool', 'threadpool', 'processpool'],
                        default='processpool',
                        help='Specific pipeline to test (with --test-single)')
     parser.add_argument('--num-workers', type=int, default=None,
@@ -564,8 +525,6 @@ def main():
         
         if args.pipeline == 'sequential':
             exec_time, results = comparison.run_sequential(image_paths, filters_config)
-        elif args.pipeline == 'multiprocessing':
-            exec_time, results = comparison.run_multiprocessing(image_paths, filters_config)
         elif args.pipeline == 'multiprocessing_pool':
             exec_time, results = comparison.run_multiprocessing_pool(image_paths, filters_config)
         elif args.pipeline == 'threadpool':
