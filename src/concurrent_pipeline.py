@@ -166,38 +166,3 @@ class ProcessPoolPipeline(ConcurrentPipeline):
         return results
 
 
-class AdaptiveConcurrentPipeline(ConcurrentPipeline):
-    """
-    Adaptive pipeline that chooses between ThreadPoolExecutor and ProcessPoolExecutor
-    based on the number of images and available resources.
-    """
-    
-    def process_images(self, image_paths: List[str], filters_config: Dict,
-                      verbose: bool = True) -> List[Tuple[str, np.ndarray]]:
-        """
-        Process images using adaptive strategy.
-        
-        Uses ThreadPoolExecutor for small batches (< 50 images) and 
-        ProcessPoolExecutor for larger batches.
-        
-        Args:
-            image_paths: List of image file paths
-            filters_config: Dictionary of filter configurations
-            verbose: Print progress information
-            
-        Returns:
-            List of (image_path, processed_image) tuples
-        """
-        # Choose executor based on workload
-        use_processes = len(image_paths) > 50
-        
-        if use_processes:
-            if verbose:
-                print("Using ProcessPoolExecutor for CPU-intensive parallel processing")
-            pipeline = ProcessPoolPipeline(num_workers=self.num_workers)
-        else:
-            if verbose:
-                print("Using ThreadPoolExecutor for smaller workload")
-            pipeline = ThreadPoolPipeline(num_workers=self.num_workers)
-        
-        return pipeline.process_images(image_paths, filters_config, verbose=verbose)

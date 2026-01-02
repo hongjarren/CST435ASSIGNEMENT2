@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from data_loader import prepare_dataset, Food101DataLoader
 from filters import ImageProcessingPipeline
 from multiprocessing_pipeline import MultiprocessingPoolPipeline
-from concurrent_pipeline import ThreadPoolPipeline, ProcessPoolPipeline, AdaptiveConcurrentPipeline
+from concurrent_pipeline import ThreadPoolPipeline, ProcessPoolPipeline
 
 
 class PerformanceComparison:
@@ -180,30 +180,7 @@ class PerformanceComparison:
         
         return elapsed_time, results
     
-    def run_adaptive(self, image_paths: List[str], filters_config: Dict) -> Tuple[float, List]:
-        """
-        Process images using adaptive pipeline.
-        
-        Args:
-            image_paths: List of image paths
-            filters_config: Filter configuration
-            
-        Returns:
-            Tuple of (execution_time, results)
-        """
-        print("\n" + "="*60)
-        print(f"ADAPTIVE CONCURRENT PIPELINE (Max Workers: {self.num_workers or 'Auto'})")
-        print("="*60)
-        
-        pipeline = AdaptiveConcurrentPipeline(num_workers=self.num_workers)
-        
-        start_time = time.time()
-        results = pipeline.process_images(image_paths, filters_config, verbose=True)
-        elapsed_time = time.time() - start_time
-        
-        print(f"Adaptive pipeline completed in {elapsed_time:.2f} seconds")
-        
-        return elapsed_time, results
+   
     
     def save_sample_results(self, results: List[Tuple[str, np.ndarray]], 
                            pipeline_name: str, max_samples: int = 5):
