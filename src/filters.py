@@ -4,8 +4,6 @@ Implements various image filters for parallel processing
 """
 
 import numpy as np
-from scipy import ndimage, signal
-from PIL import Image
 from typing import Tuple
 import cv2
 
@@ -16,12 +14,10 @@ class ImageFilters:
     @staticmethod
     def grayscale_conversion(image: np.ndarray) -> np.ndarray:
         """
-        Convert RGB image to grayscale using luminance formula.
-        
-        Formula: Gray = 0.299 * R + 0.587 * G + 0.114 * B
+        Convert RGB image to grayscale using OpenCV.
         
         Args:
-            image: RGB image array (H, W, 3)
+            image: RGB image array (H, W, 3) or BGR (H, W, 3)
             
         Returns:
             Grayscale image array (H, W)
@@ -29,9 +25,9 @@ class ImageFilters:
         if len(image.shape) == 2:
             return image  # Already grayscale
         
-        # Luminance formula for better perceptual grayscale conversion
-        gray = 0.299 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.114 * image[:, :, 2]
-        return gray.astype(np.uint8)
+        # Assume image is RGB, convert to grayscale using OpenCV's luminance weights
+        gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        return gray
     
     @staticmethod
     def gaussian_blur(image: np.ndarray, kernel_size: int = 3, sigma: float = 1.0) -> np.ndarray:
@@ -67,35 +63,26 @@ class ImageFilters:
     @staticmethod
     def edge_detection_sobel(image: np.ndarray) -> np.ndarray:
         """
-        Apply Sobel filter to detect edges.
+        Apply Sobel filter to detect edges using OpenCV.
         
         Computes gradients in X and Y directions using Sobel operators.
         
         Args:
-            image: Input image array (preferably grayscale)
+            image: Input image array (preferably grayscale or RGB)
             
         Returns:
             Edge-detected image array
         """
         # Ensure image is grayscale
         if len(image.shape) == 3:
-            image = ImageFilters.grayscale_conversion(image)
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         
-        # Sobel kernels
-        sobel_x = np.array([[-1, 0, 1],
-                           [-2, 0, 2],
-                           [-1, 0, 1]], dtype=np.float32)
-        
-        sobel_y = np.array([[-1, -2, -1],
-                           [0, 0, 0],
-                           [1, 2, 1]], dtype=np.float32)
-        
-        # Apply Sobel filters
-        edges_x = signal.convolve2d(image.astype(float), sobel_x, mode='same')
-        edges_y = signal.convolve2d(image.astype(float), sobel_y, mode='same')
+        # Apply Sobel filters in X and Y directions
+        sobel_x = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)
+        sobel_y = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=3)
         
         # Compute edge magnitude
-        edges = np.sqrt(edges_x**2 + edges_y**2)
+        edges = np.sqrt(sobel_x**2 + sobel_y**2)
         
         # Normalize to 0-255 range
         edges = (edges / edges.max() * 255).astype(np.uint8)
@@ -104,7 +91,7 @@ class ImageFilters:
     @staticmethod
     def image_sharpening(image: np.ndarray, strength: float = 1.0) -> np.ndarray:
         """
-        Enhance edges and details through sharpening.
+        Enhance edges and details through sharpening using OpenCV.
         
         Uses unsharp masking technique.
         
@@ -115,11 +102,11 @@ class ImageFilters:
         Returns:
             Sharpened image array
         """
-        # Create blurred version
-        blurred = ndimage.gaussian_filter(image.astype(float), sigma=1.0)
+        # Create blurred version using OpenCV
+        blurred = cv2.GaussianBlur(image, (5, 5), 1.0)
         
         # Unsharp mask: Original + (Original - Blurred) * strength
-        sharpened = image.astype(float) + (image.astype(float) - blurred) * strength
+        sharpened = image.astype(float) + (image.astype(float) - blurred.astype(float)) * strength
         
         # Clip values to valid range
         sharpened = np.clip(sharpened, 0, 255)
